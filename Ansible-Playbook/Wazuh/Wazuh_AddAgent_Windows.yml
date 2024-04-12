@@ -1,0 +1,18 @@
+---
+- name: Install Wazuh Agent on Windows
+  hosts: windows_server
+  tasks:
+    - name: Download Wazuh Agent MSI
+      win_shell: |
+        Invoke-WebRequest -Uri 'https://packages.wazuh.com/4.x/windows/wazuh-agent-4.7.3-1.msi' -OutFile $env:TEMP\wazuh-agent
+      register: download_result
+
+    - name: Install Wazuh Agent
+      win_shell: |
+        msiexec.exe /i $env:TEMP\wazuh-agent /q WAZUH_MANAGER='{{ server_ip }}' WAZUH_AGENT_GROUP='{{ agent_group }}' WAZUH_AGENT_NAME='{{ agent_name }}' WAZUH_REGISTRATION_SERVER='{{ server_ip }}'
+      when: download_result.rc == 0
+
+    - name: Start Wazuh Service
+      win_shell: |
+        NET START WazuhSvc
+      when: download_result.rc == 0

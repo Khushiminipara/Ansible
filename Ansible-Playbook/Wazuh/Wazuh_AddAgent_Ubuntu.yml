@@ -1,0 +1,32 @@
+---
+- name: Install Wazuh Agent and Register with Wazuh Manager
+  hosts: servers
+  become: yes
+  vars:
+    wazuh_manager: "{{ server_ip }}"
+    wazuh_agent_group: "{{ agent_group }}"
+    wazuh_agent_name: "{{ agent_name }}"
+    wazuh_agent_version: "4.7.3-1"
+    wazuh_agent_arch: "amd64"
+    wazuh_agent_deb_url: "https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_{{ wazuh_agent_version }}_{{ wazuh_agent_arch }}.deb"
+  tasks:
+    - name: Download Wazuh Agent package
+      get_url:
+        url: "{{ wazuh_agent_deb_url }}"
+        dest: "/tmp/wazuh-agent_{{ wazuh_agent_version }}_{{ wazuh_agent_arch }}.deb"
+
+    - name: Install Wazuh Agent
+      shell: "sudo WAZUH_MANAGER='{{ wazuh_manager }}' WAZUH_AGENT_GROUP='{{ wazuh_agent_group }}' WAZUH_AGENT_NAME='{{ wazuh_agent_name }}' dpkg -i /tmp/wazuh-agent_{{ wazuh_agent_version }}_{{ wazuh_agent_arch }}.deb"
+      args:
+        executable: /bin/bash
+
+    - name: Reload systemd manager configuration
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable Wazuh Agent
+      systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: started
+

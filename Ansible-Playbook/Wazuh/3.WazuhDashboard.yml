@@ -1,0 +1,77 @@
+---
+- name: Configure Wazuh Dashboard
+  hosts: servers
+  become: yes
+
+  environment:
+    NODE_NAME: "dashboard"
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - debhelper
+        - tar
+        - curl
+        - libcap2-bin
+
+    - name: Install Wazuh Dashboard
+      ansible.builtin.shell:
+        cmd: "apt-get -y install wazuh-dashboard"
+
+    - name: Edit opensearch_dashboards.yml
+      ansible.builtin.replace:
+        path: "/etc/wazuh-dashboard/opensearch_dashboards.yml"
+        regexp: "{{ item.regexp }}"
+        replace: "{{ item.replace }}"
+      loop:
+        - { regexp: 'server\.host:.*', replace: 'server.host: {{ dashboard_ip }}' }
+        - { regexp: 'opensearch\.hosts:.*', replace: 'opensearch.hosts: ["https://{{ node_ip }}:9200"]' }
+
+
+    - name: Create certs directory
+      ansible.builtin.file:
+        path: "/etc/wazuh-dashboard/certs"
+        state: directory
+
+    - name: Extract certificates
+      ansible.builtin.shell:
+        cmd: "tar -xf /home/{{ ansible_username }}/wazuh-certificates.tar -C /etc/wazuh-dashboard/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./root-ca.pem"
+
+    - name: Rename certificate files
+      ansible.builtin.shell:
+        cmd: "mv -n /etc/wazuh-dashboard/certs/$NODE_NAME.pem /etc/wazuh-dashboard/certs/dashboard.pem && mv -n /etc/wazuh-dashboard/certs/$NODE_NAME-key.pem /etc/wazuh-dashboard/certs/dashboard-key.pem"
+
+    - name: Set permissions for certs directory
+      ansible.builtin.file:
+        path: "/etc/wazuh-dashboard/certs"
+        mode: "0500"
+
+    - name: Set permissions on certificate files
+      ansible.builtin.file:
+        path: "/etc/wazuh-dashboard/certs/{{ item }}"
+        mode: "0400"
+      loop:
+        - dashboard-key.pem
+        - dashboard.pem
+        - root-ca.pem
+
+    - name: Change ownership of certs directory
+      ansible.builtin.shell:
+        cmd: "chown -R wazuh-dashboard:wazuh-dashboard /etc/wazuh-dashboard/certs"
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable Wazuh Dashboard service
+      ansible.builtin.service:
+        name: wazuh-dashboard
+        enabled: yes
+
+    - name: Start Wazuh Dashboard service
+      ansible.builtin.service:
+        name: wazuh-dashboard
+        state: started

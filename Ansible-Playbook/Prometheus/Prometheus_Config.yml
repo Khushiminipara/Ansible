@@ -1,0 +1,17 @@
+---
+- name: Edit Prometheus configuration
+  hosts: servers
+  vars:
+    new_target: "192.168.1.6:9090"
+  tasks:
+    - name: Read the prometheus.yml file
+      slurp:
+        src: /usr/local/bin/prometheus/prometheus.yml
+      register: prometheus_file
+
+    - name: Modify the static_configs section for prometheus job
+      replace:
+        path: /usr/local/bin/prometheus/prometheus.yml
+        regexp: "(job_name: \"prometheus\")(\n\\s+# metrics_path defaults to '/metrics'\n\\s+# scheme defaults to 'http'.\n\\s+static_configs:)"
+        replace: "\\1\\2\n      - targets: [\"{{ new_target }}\"]"
+      when: prometheus_file['content'] is defined

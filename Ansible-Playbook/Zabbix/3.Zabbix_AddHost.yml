@@ -1,0 +1,80 @@
+---
+- name: Add Host to the Zabbix Server
+  hosts: zabbix_host
+  tasks:
+    - name: get zabbix version
+      ansible.builtin.uri:
+        url: "{{ zabbix_api_server_url }}/api_jsonrpc.php"
+        method: POST
+        body:
+          jsonrpc: "2.0"
+          method: "apiinfo.version"
+          params: []
+          id: "1"
+        body_format: json
+        status_code: 200
+      retries: 60
+      delay: 5
+      until: zabbix_version_result is defined and 'json' in zabbix_version_result and 'result' in zabbix_version_result.json
+      register: zabbix_version_result
+
+    - name: set zabbix_version variable
+      ansible.builtin.set_fact:
+        zabbix_version: >-
+          {{ [0,1]
+            | map('extract', zabbix_version_result.json.result.split('.'))
+            | list
+            | join('.')
+          }}
+        ansible_network_os: community.zabbix.zabbix
+        ansible_connection: httpapi
+        # ansible_zabbix_auth_key: 
+        ansible_host: "{{ zabbix_server }}"
+        ansible_zabbix_url_path: "/zabbix"
+        ansible_httpapi_port: 80
+        ansible_httpapi_use_ssl: false
+        ansible_httpapi_validate_certs: false
+        ansible_user: "{{ zabbix_username }}"
+        ansible_httpapi_pass: "{{ zabbix_password }}"
+
+    - debug: var=zabbix_version
+
+
+    - name: check login to zabbix for Zabbix >= 6.4
+      ansible.builtin.uri:
+        url: "{{ zabbix_api_server_url }}/api_jsonrpc.php"
+        method: POST
+        body:
+          jsonrpc: "2.0"
+          method: "user.login"
+          params:
+            username: "{{ zabbix_api_login_user }}"
+            password: "{{ zabbix_api_login_pass }}"
+          id: "1"
+        body_format: json
+        status_code: 200
+      retries: 60
+      delay: 5
+      until: check_login_result is defined and 'json' in check_login_result and 'result' in check_login_result.json
+      register: check_login_result
+      when: zabbix_version is version('6.4', '>=')
+
+    - name: "test: create host with many options set"
+      community.zabbix.zabbix_host:
+        host_name: Ansible
+        visible_name: Try
+        description: Add Host Using Ansible
+        host_groups:
+          - Linux servers
+        link_templates:
+          - "Linux by Zabbix agent"
+        status: enabled
+        state: present
+        inventory_mode: automatic
+        interfaces:
+          - type: 1
+            main: 1
+            useip: 1
+            ip: 172.20.10.2
+            dns: ""
+            port: "10050"

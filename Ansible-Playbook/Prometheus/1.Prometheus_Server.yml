@@ -1,0 +1,53 @@
+---
+- name: Install and Configure Prometheus, Node Exporter, and Blackbox Exporter
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Download Prometheus package
+      get_url:
+        url: https://github.com/prometheus/prometheus/releases/download/v2.51.1/prometheus-2.51.1.linux-amd64.tar.gz
+        dest: /home/{{ ansible_username }}/prometheus-2.51.1.linux-amd64.tar.gz
+
+    - name: Extract Prometheus package
+      ansible.builtin.unarchive:
+        src: /home/{{ ansible_username }}/prometheus-2.51.1.linux-amd64.tar.gz
+        dest: /home/{{ ansible_username}}/
+        remote_src: yes
+
+    - name: Copy Prometheus binaries to /usr/local/bin
+      copy:
+        src: /home/{{ ansible_username }}/prometheus-2.51.1.linux-amd64/
+        dest: /usr/local/bin/prometheus/
+        remote_src: yes
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: Create Prometheus systemd service file
+      copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus Service
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/local/bin/prometheus/prometheus --config.file=/usr/local/bin/prometheus/prometheus.yml
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Reload systemd to read Prometheus service file
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Prometheus service
+      ansible.builtin.service:
+        name: prometheus
+        state: started
+        enabled: yes

@@ -1,0 +1,52 @@
+---
+- name: Install and Configure Prometheus, Node Exporter, and Blackbox Exporter
+  hosts: servers
+  become: yes
+
+  tasks:
+    - name: Download Node Exporter package
+      get_url:
+        url: https://github.com/prometheus/node_exporter/releases/download/v1.2.2/node_exporter-1.2.2.linux-amd64.tar.gz
+        dest: /home/{{ ansible_username }}/node_exporter-1.2.2.linux-amd64.tar.gz
+
+    - name: Extract Node Exporter package
+      ansible.builtin.unarchive:
+        src: /home/{{ ansible_username }}/node_exporter-1.2.2.linux-amd64.tar.gz
+        dest: /home/{{ ansible_username }}/
+        remote_src: yes
+
+    - name: Copy Node Exporter binary to /usr/local/bin
+      copy:
+        src: /home/{{ ansible_username }}/node_exporter-1.2.2.linux-amd64/
+        dest: /usr/local/bin/node_exporter
+        remote_src: yes
+        owner: root
+        group: root
+        mode: 0755
+
+    - name: Create Node Exporter systemd service file
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/local/bin/node_exporter/node_exporter
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Reload systemd to read Node Exporter service file
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Node Exporter service
+      ansible.builtin.service:
+        name: node_exporter
+        state: started
+        enabled: yes

@@ -1,0 +1,91 @@
+---
+- name: Install Grafana
+  hosts: servers
+  become: yes  # Ensure that you have sudo privileges
+
+  vars:
+    data_uid: "data_uid"
+
+  tasks:
+    - name: Create Elasticsearch datasource
+      community.grafana.grafana_datasource:
+        name: "{{ datasource_name }}"
+        grafana_url: "http://{{ ip_address }}:3000"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        org_id: "1"
+        ds_type: "elasticsearch"
+        ds_url: "{{ datasource_url }}"
+        database:  "wazuh-alerts-*"
+        basic_auth_user: "{{ auth_username }}"
+        basic_auth_password: "{{ auth_password }}"
+        time_field: "@timestamp"
+        time_interval: "10s"
+        interval: ""
+        es_version: 7.10+
+        #index: "wazuh-monitoring-2024.12w"
+        #pattern: ""
+        tls_skip_verify: yes
+        max_concurrent_shard_requests: 5
+        #tls_ca_cert: "/etc/ssl/certs/ca.pem"
+
+    - name: Copy file
+      ansible.builtin.copy:
+        src: ~/Downloads/dashboard.json  # Replace with the path to the file on the control node
+        dest: ~/Downloads/  # Replace with the path on the remote machine where you want to copy the file
+
+    - name: Get datasources list
+      uri:
+        url: "http://{{ ip_address }}:3000/api/datasources"
+        headers:
+          Authorization: "Basic {{ '{{ grafana_username }}:{{ grafana_password }}' | b64encode }}"
+          Content-Type: "application/json"
+        method: GET
+        return_content: yes
+      register: datasources_response
+
+    - name: Extract UID
+      set_fact:
+        datasource_uid: "{{ item.uid }}"
+      loop: "{{ datasources_response.json }}"
+      when: item.name == '{{ datasource_name }}'
+
+    - name: Print UID
+      debug:
+        msg: "The UID of the datasource is {{ datasource_uid }}"
+      when: datasource_uid is defined
+
+    - name: Read the content of the text file
+      ansible.builtin.slurp:
+        path: ~/Downloads/dashboard.json
+      register: file_content
+
+    - name: Convert file content from bytes to string
+      set_fact:
+        file_content_string: "{{ file_content.content | b64decode | to_nice_yaml }}"
+
+    - name: Replace old_value with new_value in the text file
+      ansible.builtin.replace:
+        path: ~/Downloads/dashboard.json
+        regexp: "{{ data_uid | regex_escape }}"
+        replace: "{{ datasource_uid }}"
+  
+    - name: Get the path of the dashboard JSON file
+      find:
+        paths: "~/Downloads"
+        patterns: "dashboard.json"
+      register: dashboard_files
+
+    - name: Ensure the dashboard file exists
+      fail:
+        msg: "Dashboard JSON file not found in ~/Downloads directory."
+      when: dashboard_files.matched == 0
+
+    - name: Import dashboard
+      community.grafana.grafana_dashboard:
+        grafana_url: "http://localhost:3000"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        state: present
+        overwrite: true
+        path: "{{ dashboard_files.files[0].path }}"
