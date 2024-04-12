@@ -1,0 +1,25 @@
+---
+- name: Install and start InfluxDB
+  hosts: servers
+  become: true
+  tasks:
+    - name: Fix broken dependencies
+      ansible.builtin.command: apt --fix-broken install
+
+    - name: Install curl package
+      ansible.builtin.apt:
+        name: curl
+        state: present
+
+    - name: Download InfluxDB deb package
+      ansible.builtin.get_url:
+        url: https://dl.influxdata.com/influxdb/releases/influxdb2_2.7.5-1_amd64.deb
+        dest: /home/{{ ansible_username }}/influxdb2_2.7.5-1_amd64.deb
+
+    - name: Install InfluxDB deb package
+      ansible.builtin.command: dpkg -i /home/{{ ansible_username }}/influxdb2_2.7.5-1_amd64.deb
+
+    - name: Start InfluxDB service
+      ansible.builtin.service:
+        name: influxdb
+        state: started
