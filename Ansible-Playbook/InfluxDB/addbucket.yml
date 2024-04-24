@@ -1,0 +1,34 @@
+---
+- name: Create InfluxDB Bucket
+  hosts: servers
+  vars:
+    influxdb_token: "3FyFIgwJDwatkt-NR59rDElqeJJdjEml0wWUBly0ItltL_BZ3rnPUn2AmNfEb4K3mE9weRmV_em3TY0qbIDMag=="
+    bucket_name: "bucket3"
+    org_id: "fb04bc8c89ca4661"
+  tasks:
+    - name: Create InfluxDB Bucket
+      uri:
+        url: "http://192.168.1.6:8086/api/v2/buckets"
+        method: POST
+        headers:
+          Authorization: "Token {{ influxdb_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ bucket_name }}"
+          orgID: "{{ org_id }}"
+      register: create_bucket_response
+
+    - name: Debug Bucket Creation Response
+      debug:
+        var: create_bucket_response.json
+
+    - name: Extract Bucket ID
+      set_fact:
+        bucket_id: "{{ create_bucket_response.json.id }}"
+       # Include status code 201
+
+    - name: Display Bucket ID
+      debug:
+        msg: "Bucket '{{ bucket_name }}' created successfully with ID: {{ bucket_id }}"
+        
