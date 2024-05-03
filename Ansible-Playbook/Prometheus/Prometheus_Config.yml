@@ -1,6 +1,6 @@
 ---
 - name: Edit Prometheus configuration
-  hosts: servers
+  hosts: prometheus
   vars:
     new_target: "192.168.1.6:9090"
   tasks:

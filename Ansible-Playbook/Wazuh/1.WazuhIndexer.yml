@@ -1,49 +1,11 @@
 ---
-- name: Download Wazuh certificates tool and config file
-  hosts: servers
+- name: Install and Configure Wazuh Indexer
+  hosts: wazuh
   become: yes
 
   environment:
     NODE_NAME: "node-1"
   tasks:
-    - name: Download wazuh-certs-tool.sh
-      ansible.builtin.get_url:
-        url: https://packages.wazuh.com/4.7/wazuh-certs-tool.sh
-        dest: /home/{{ ansible_username }}/wazuh-certs-tool.sh
-        mode: '0755'  # Ensure execute permission
-
-    - name: Download config.yml
-      ansible.builtin.get_url:
-        url: https://packages.wazuh.com/4.7/config.yml
-        dest: /home/{{ ansible_username }}/config.yml
-
-    - name: Replace indexer node IP
-      ansible.builtin.lineinfile:
-        path: /home/{{ ansible_username }}//config.yml
-        regexp: '^\s*ip:\s*"<indexer-node-ip>"'
-        line: '      ip: "{{ node_ip }}"'
-
-    - name: Replace server node IP
-      ansible.builtin.lineinfile:
-        path: /home/{{ ansible_username }}//config.yml
-        regexp: '^\s*ip:\s*"<wazuh-manager-ip>"'
-        line: '      ip: "{{ server_ip }}"'
-
-    - name: Replace dashboard node IP
-      ansible.builtin.lineinfile:
-        path: /home/{{ ansible_username }}//config.yml
-        regexp: '^\s*ip:\s*"<dashboard-node-ip>"'
-        line: '      ip: "{{ dashboard_ip }}"'
-
-    - name: Run wazuh-certs-tool.sh -A
-      ansible.builtin.shell: bash /home/{{ ansible_username }}/wazuh-certs-tool.sh -A
-
-    - name: Create wazuh-certificates.tar
-      ansible.builtin.shell: tar -cvf /home/{{ ansible_username }}/wazuh-certificates.tar -C /home/{{ ansible_username }}/wazuh-certificates/ .
-
-    - name: Remove wazuh-certificates directory
-      ansible.builtin.shell: rm -rf /home/{{ ansible_username }}/wazuh-certificates
-
     - name: Install required packages
       apt:
         name: "{{ item }}"
@@ -52,6 +14,27 @@
         - gnupg
         - apt-transport-https
         - curl
+
+    - name: Download wazuh-certs-tool.sh
+      ansible.builtin.get_url:
+        url: https://packages.wazuh.com/4.7/wazuh-certs-tool.sh
+        dest: /home/{{ target_username }}/wazuh-certs-tool.sh
+        mode: '0755'  # Ensure execute permission
+
+    - name: Copy Configuration File
+      template:
+        src: /home/{{ control_username }}/config.yml.j2  # Path to your local Jinja2 template file
+        dest: /home/{{ target_username }}/config.yml  # Destination path and new name on the remote machine
+        mode: 0644
+
+    - name: Run wazuh-certs-tool.sh -A
+      ansible.builtin.shell: bash /home/{{ target_username }}/wazuh-certs-tool.sh -A
+
+    - name: Create wazuh-certificates.tar
+      ansible.builtin.shell: tar -cvf /home/{{ target_username }}/wazuh-certificates.tar -C /home/{{ target_username }}/wazuh-certificates/ .
+
+    - name: Remove wazuh-certificates directory
+      ansible.builtin.shell: rm -rf /home/{{ target_username }}/wazuh-certificates
 
     - name: Import Wazuh GPG key
       ansible.builtin.shell: |
@@ -82,7 +65,7 @@
 
     - name: Extract certificates tar file
       ansible.builtin.command:
-        cmd: tar -xf /home/{{ ansible_username }}/wazuh-certificates.tar -C /etc/wazuh-indexer/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./admin.pem ./admin-key.pem ./root-ca.pem
+        cmd: tar -xf /home/{{ target_username }}/wazuh-certificates.tar -C /etc/wazuh-indexer/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./admin.pem ./admin-key.pem ./root-ca.pem
       args:
         creates: /etc/wazuh-indexer/certs/indexer.pem  # Specify the certificate file path
 

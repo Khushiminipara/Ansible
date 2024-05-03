@@ -1,0 +1,110 @@
+---
+- name: Download Wazuh Server
+  hosts: servers
+  become: yes
+  
+  environment:
+    NODE_NAME: "wazuh-1"
+
+  tasks:
+    - name: Install required packages
+      shell: apt-get install -y gnupg apt-transport-https curl
+
+    - name: Import Wazuh GPG key
+      shell: "curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg"
+      args:
+        creates: /usr/share/keyrings/wazuh.gpg
+
+    - name: Add Wazuh repository
+      shell: "echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' | tee -a /etc/apt/sources.list.d/wazuh.list"
+      args:
+        creates: /etc/apt/sources.list.d/wazuh.list
+
+    - name: Update package information
+      shell: apt-get update
+
+    - name: Install wazuh-manager package
+      shell: apt-get -y install wazuh-manager
+      
+    - name: Reload systemd daemon
+      shell: systemctl daemon-reload
+
+    - name: Enable Wazuh Manager service
+      shell: systemctl enable wazuh-manager
+
+    - name: Start Wazuh Manager service
+      shell: systemctl start wazuh-manager
+
+    - name: Install Filebeat service
+      shell: apt-get -y install filebeat
+
+    - name: Download Filebeat File
+      shell: "curl -sSL -o /etc/filebeat/filebeat.yml https://packages.wazuh.com/4.7/tpl/wazuh/filebeat/filebeat.yml"
+
+    - name: Copy and rename Filebeat configuration file
+      template:
+        src: /home/{{ control_node }}/filebeat.yml.j2  # Path to your local Jinja2 template file
+        dest: /etc/filebeat/filebeat.yml  # Destination path and new name on the remote machine
+        owner: "root"  # Owner of the file on the remote machine
+        group: "root"  # Group of the file on the remote machine
+        mode: "0644"  # Permissions for the file on the remote machine
+
+    - name: Create Filebeat keystore for credentials
+      ansible.builtin.shell: "filebeat keystore create /home/{{ ansible_username }}"
+
+    - name: Add default username to Filebeat keystore
+      ansible.builtin.shell: "echo admin | filebeat keystore add username --stdin --force"
+
+    - name: Add default password to Filebeat keystore
+      ansible.builtin.shell: "echo admin | filebeat keystore add password --stdin --force"
+
+    - name: Download Wazuh alerts template
+      ansible.builtin.shell:
+        cmd: curl -so /etc/filebeat/wazuh-template.json https://raw.githubusercontent.com/wazuh/wazuh/v4.7.3/extensions/elasticsearch/7.x/wazuh-template.json
+
+    - name: Set permissions for Wazuh alerts template
+      ansible.builtin.file:
+        path: "/etc/filebeat/wazuh-template.json"
+        mode: 'go+r'
+      
+    - name: Install Wazuh module for Filebeat
+      ansible.builtin.shell: "curl -s https://packages.wazuh.com/4.x/filebeat/wazuh-filebeat-0.3.tar.gz | tar -xvz -C /usr/share/filebeat/module"
+    
+    - name: Make directory for certificates
+      shell: mkdir -p /etc/filebeat/certs
+      
+    - name: Extract certificates tar file
+      shell: "tar -xf /home/{{ ansible_username }}/wazuh-certificates.tar -C /etc/filebeat/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./root-ca.pem"
+      args:
+        creates: /etc/filebeat/certs/filebeat.pem
+
+    - name: Rename indexer certificate
+      shell: mv -n /etc/filebeat/certs/$NODE_NAME.pem /etc/filebeat/certs/filebeat.pem
+      args:
+        creates: /etc/filebeat/certs/filebeat-key.pem
+
+    - name: Rename indexer key
+      shell: mv -n /etc/filebeat/certs/$NODE_NAME-key.pem /etc/filebeat/certs/filebeat-key.pem
+
+    - name: Set permissions on certs directory
+      shell: chmod 0500 /etc/filebeat/certs
+
+    - name: Set permissions on certificate files
+      shell: chmod 0400 "/etc/filebeat/certs/{{ item }}"
+      loop:
+        - filebeat-key.pem
+        - filebeat.pem
+        - root-ca.pem
+
+    - name: Change ownership of certs directory
+      shell: chown -R root:root /etc/filebeat/certs
+
+    - name: Reload systemd daemon
+      shell: systemctl daemon-reload
+
+    - name: Enable Filebeat service
+      shell: systemctl enable filebeat
+
+    - name: Start Filebeat service
+      shell: systemctl start filebeat
+

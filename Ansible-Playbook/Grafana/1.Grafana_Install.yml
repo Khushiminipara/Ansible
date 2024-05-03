@@ -1,6 +1,6 @@
 ---
 - name: Install Grafana
-  hosts: servers
+  hosts: grafana
   become: yes  # Ensure that you have sudo privileges
 
   tasks:

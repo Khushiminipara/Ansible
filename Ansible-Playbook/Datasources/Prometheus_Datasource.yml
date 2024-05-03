@@ -1,0 +1,22 @@
+---
+- name: Install Prometheus Datasource
+  hosts: servers
+  become: true
+
+  tasks:
+    - name: Add Prometheus datasource
+      community.grafana.grafana_datasource:
+        name: "{{ datasource_name }}"
+        grafana_url: "{{ grafana_url }}"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        ds_type: "prometheus"
+        access: "proxy"
+        ds_url: "{{ prometheus_url }}"
+        org_id: 1
+        tls_skip_verify: yes
+      register: grafana_response
+
+    - name: Print response
+      debug:
+        var: grafana_response

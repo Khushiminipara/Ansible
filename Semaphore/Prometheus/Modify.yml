@@ -1,0 +1,17 @@
+---
+- name: Modify Blackbox Job
+  hosts: prometheus
+  vars:
+    websites: 
+      - https://www.semicoa.com/
+      - https://laserdiode.com/
+  tasks:
+    - name: Add blackbox scrape config
+      action: ansible.builtin.lineinfile
+      args:
+        path: /usr/local/bin/prometheus/prometheus.yml
+        insertafter: '^\s+(module: \[http_2xx\]|static_configs:|- targets:)$'
+        line: >-
+          {% for website in websites %}
+                    - {{ website }}
+          {% endfor %}

@@ -1,0 +1,22 @@
+- name: Install and Configure Node_Exporter
+  hosts: prometheus
+  become: yes
+  tasks:
+    - name: Download Node Exporter package
+      action: get_url url=https://github.com/prometheus/node_exporter/releases/download/v1.8.0/node_exporter-1.8.0.linux-amd64.tar.gz dest=/home/{{ target_username }}/node_exporter-1.8.0.linux-amd64.tar.gz
+
+    - name: Extract Node Exporter package
+      action: ansible.builtin.unarchive src=/home/{{ target_username }}/node_exporter-1.8.0.linux-amd64.tar.gz dest=/home/{{ target_username }}/ remote_src=yes
+
+    - name: Copy Node Exporter binary to /usr/local/bin
+      action: copy src=/home/{{ target_username }}/node_exporter-1.8.0.linux-amd64/ dest=/usr/local/bin/node_exporter remote_src=yes owner=root group=root mode=0755
+
+    - name: Create Node Exporter systemd service file
+      action: copy dest=/etc/systemd/system/node-exporter.service content="[Unit]\nDescription=Node Exporter\nAfter=network.target\n\n[Service]\nExecStart=/usr/local/bin/node_exporter/node_exporter\n\n[Install]\nWantedBy=multi-user.target\n" owner=root group=root mode=0644
+
+    - name: Reload systemd to read Node Exporter service file
+      action: ansible.builtin.systemd daemon_reload=yes
+
+    - name: Enable and start Node Exporter service
+      action: ansible.builtin.service name=node-exporter state=started enabled=yes
+

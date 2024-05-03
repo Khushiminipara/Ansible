@@ -1,0 +1,11 @@
+---
+- name: Add blackbox scrape config to prometheus.yml
+  hosts: prometheus
+  tasks:
+    - name: Add blackbox scrape config
+      ansible.builtin.lineinfile:
+        path: /usr/local/bin/prometheus/prometheus.yml
+        insertafter: '^\s+(module: \[http_2xx\]|static_configs:|- targets:)$'
+        line:  "          - https://www.google.com"
+
+

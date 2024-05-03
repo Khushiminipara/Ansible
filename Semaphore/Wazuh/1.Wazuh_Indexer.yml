@@ -1,0 +1,93 @@
+---
+- name: Download Wazuh Indexer
+  hosts: servers
+  become: yes
+
+  environment:
+    NODE_NAME: "node-1"
+
+  tasks:
+    - name: Install required packages
+      shell: apt-get install -y gnupg apt-transport-https curl
+
+    - name: Download wazuh-certs-tool.sh
+      shell: "curl -sSL -o /home/{{ ansible_username }}/wazuh-certs-tool.sh https://packages.wazuh.com/4.7/wazuh-certs-tool.sh"
+
+    - name: Copy Configuration File
+      template:
+        src: /home/{{ control_node }}/config.yml.j2  # Path to your local Jinja2 template file
+        dest: /home/{{ ansible_username }}/config.yml  # Destination path and new name on the remote machine
+        owner: "root"  # Owner of the file on the remote machine
+        group: "root"  # Group of the file on the remote machine
+        mode: "0644"  # Permissions for the file on the remote machine
+        
+    - name: Run wazuh-certs-tool.sh -A
+      shell: bash /home/{{ ansible_username }}/wazuh-certs-tool.sh -A
+
+    - name: Create wazuh-certificates.tar
+      shell: tar -cvf /home/{{ ansible_username }}/wazuh-certificates.tar -C /home/{{ ansible_username }}/wazuh-certificates/ .
+
+    - name: Remove wazuh-certificates directory
+      shell: rm -rf /home/{{ ansible_username }}/wazuh-certificates
+
+    - name: Import Wazuh GPG key
+      shell: "curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg"
+      args:
+        creates: /usr/share/keyrings/wazuh.gpg
+
+    - name: Add Wazuh repository
+      shell: "echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' | tee -a /etc/apt/sources.list.d/wazuh.list"
+      args:
+        creates: /etc/apt/sources.list.d/wazuh.list
+
+    - name: Update package information
+      shell: apt-get update
+
+    - name: Install wazuh-indexer package
+      shell: apt-get -y install wazuh-indexer
+
+    - name: Replace network.host in opensearch.yml
+      shell: "sed -i 's/^network.host: \"0.0.0.0\"/network.host: \"{{ node_ip }}\"/' /etc/wazuh-indexer/opensearch.yml"
+
+    - name: Make directory for certificates
+      shell: mkdir -p /etc/wazuh-indexer/certs
+
+    - name: Extract certificates tar file
+      shell: "tar -xf /home/{{ ansible_username }}/wazuh-certificates.tar -C /etc/wazuh-indexer/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./admin.pem ./admin-key.pem ./root-ca.pem"
+      args:
+        creates: /etc/wazuh-indexer/certs/indexer.pem
+
+    - name: Rename indexer certificate
+      shell: mv -n /etc/wazuh-indexer/certs/$NODE_NAME.pem /etc/wazuh-indexer/certs/indexer.pem
+      changed_when: false
+
+    - name: Rename indexer key
+      shell: mv -n /etc/wazuh-indexer/certs/$NODE_NAME-key.pem /etc/wazuh-indexer/certs/indexer-key.pem
+      changed_when: false
+
+    - name: Set permissions on certs directory
+      shell: chmod 0500 /etc/wazuh-indexer/certs
+
+    - name: Set permissions on certificate files
+      shell: chmod 0400 "/etc/wazuh-indexer/certs/{{ item }}"
+      loop:
+        - admin-key.pem
+        - admin.pem
+        - indexer-key.pem
+        - indexer.pem
+        - root-ca.pem
+
+    - name: Change ownership of certs directory
+      shell: chown -R wazuh-indexer:wazuh-indexer /etc/wazuh-indexer/certs
+
+    - name: Reload systemd daemon
+      shell: systemctl daemon-reload
+
+    - name: Enable Wazuh Indexer service
+      shell: systemctl enable wazuh-indexer
+
+    - name: Start Wazuh Indexer service
+      shell: systemctl start wazuh-indexer
+
+    - name: Run indexer-security-init.sh script
+      shell: /usr/share/wazuh-indexer/bin/indexer-security-init.sh

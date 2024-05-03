@@ -3,7 +3,7 @@
   hosts: zabbix_agents
   become: yes  # Use become to get root privileges
   vars:
-    download_dest: "/home/{{ ansible_username }}"
+    download_dest: "/home/{{ target_username }}"
   tasks:
     - name: Download Zabbix release package
       ansible.builtin.get_url:
@@ -27,7 +27,7 @@
 
     - name: Upload Jinja2 template file
       ansible.builtin.template:
-        src: "/home/wazuh/zabbix_agentd.conf.j2"
+        src: "/home/{{ control_username }}/zabbix_agentd.conf.j2"
         dest: "/etc/zabbix/zabbix_agentd.conf"  # Specify the destination path on the target host
         owner: root  # Specify the owner of the uploaded file
         group: root

@@ -7,11 +7,11 @@
     - name: Download Zabbix repository package
       get_url:
         url: https://repo.zabbix.com/zabbix/6.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.4-1+ubuntu22.04_all.deb
-        dest: /home/{{ ansible_username }}/zabbix-release_6.4-1+ubuntu22.04_all.deb
+        dest: /home/{{ target_username }}/zabbix-release_6.4-1+ubuntu22.04_all.deb
 
     - name: Install Zabbix repository package
       apt:
-        deb: /home/{{ ansible_username }}/zabbix-release_6.4-1+ubuntu22.04_all.deb
+        deb: /home/{{ target_username }}/zabbix-release_6.4-1+ubuntu22.04_all.deb
 
     - name: Update apt cache
       apt:
@@ -55,13 +55,13 @@
             quit;
 
     - name: Copy the Zabbix Script Zip File
-      command: cp /usr/share/zabbix-sql-scripts/mysql/server.sql.gz /home/{{ ansible_username }}/
+      command: cp /usr/share/zabbix-sql-scripts/mysql/server.sql.gz /home/{{ target_username }}/
 
     - name: Unzip Zabbix SQL Script
-      command: gunzip /home/{{ ansible_username }}/server.sql.gz
+      command: gunzip /home/{{ target_username }}/server.sql.gz
 
     - name: Import SQL Script file into MySQL database
-      shell: mysql -uzabbix -p{{ zabbix_password }} zabbix < /home/{{ ansible_username }}/server.sql
+      shell: mysql -uzabbix -p{{ zabbix_password }} zabbix < /home/{{ target_username }}/server.sql
 
     - name: Create Zabbix database, user, and set privileges using expect
       expect:
@@ -74,8 +74,8 @@
 
     - name: Copy Configuration Template File
       template:
-        src: /home/ansible/zabbix_server.conf.j2
-        dest: /etc/{{ ansible_username }}/zabbix_server.conf
+        src: /home/{{ control_username }}/zabbix_server.conf.j2
+        dest: /etc/{{ target_username }}/zabbix_server.conf
         mode: "0600"
 
     - name: Restart Zabbix Server, Zabbix Agent, and Apache2

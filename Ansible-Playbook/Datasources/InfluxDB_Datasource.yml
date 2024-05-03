@@ -1,0 +1,33 @@
+---
+- name: Create InfluxDB Datasource
+  hosts: datasource
+  become: true
+
+  tasks:
+    - name: Add InfluxDB datasource to Grafana
+      community.grafana.grafana_datasource:
+        grafana_url: "{{ grafana_url }}"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        name: "{{ datasource_name }}"
+        ds_type: influxdb
+        access: proxy
+        ds_url: "{{ datasource_url }}"
+        database: ""
+        basic_auth_user: "{{ auth_username }}"
+        basic_auth_password: "{{ auth_password }}"
+        tls_skip_verify: true  # Add this line to skip TLS verification
+        additional_secure_json_data:
+          token: "{{ influxdb_token }}"  # Set the token        
+        additional_json_data:
+          token: "{{ influxdb_token }}"  # Set the token
+          defaultBucket: "{{ default_bucket }}"  # Set the default bucket
+          organization: "{{ organization }}"  # Set the organization
+          version: "Flux"  # Set query language to Flux
+        is_default: false
+      register: grafana_response
+
+    - name: Print response
+      debug:
+        var: grafana_response
+

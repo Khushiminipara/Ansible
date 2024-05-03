@@ -1,0 +1,23 @@
+---
+- name: Install Grafana
+  hosts: servers
+  become: yes  # Ensure that you have sudo privileges
+
+  tasks:
+    - name: Install dependencies
+      action: ansible.builtin.package name={{ item }} state=present
+      with_items:
+        - apt-transport-https
+        - software-properties-common
+  
+    - name: Add Grafana APT repository key
+      action: ansible.builtin.apt_key url=https://packages.grafana.com/gpg.key state=present
+  
+    - name: Add Grafana APT repository
+      action: ansible.builtin.apt_repository repo='deb https://packages.grafana.com/oss/deb stable main' state=present
+  
+    - name: Update apt and install Grafana
+      action: ansible.builtin.apt update_cache=yes name=grafana state=present
+  
+    - name: Start Grafana service
+      action: ansible.builtin.service name=grafana-server state=started enabled=yes

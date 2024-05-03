@@ -1,0 +1,23 @@
+---
+- name: Install and Configure Prometheus
+  hosts: prometheus
+  become: yes
+  tasks:
+    - name: Download Prometheus package
+      action: get_url url=https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz dest=/home/{{ target_username }}/prometheus-2.51.2.linux-amd64.tar.gz
+
+    - name: Extract Prometheus package
+      action: ansible.builtin.unarchive src=/home/{{ target_username }}/prometheus-2.51.2.linux-amd64.tar.gz dest=/home/{{ target_username}}/ remote_src=yes
+
+    - name: Copy Prometheus binaries to /usr/local/bin
+      action: copy src=/home/{{ target_username }}/prometheus-2.51.2.linux-amd64/ dest=/usr/local/bin/prometheus/ remote_src=yes owner=root group=root mode=0755
+
+    - name: Create Prometheus systemd service file
+      action: copy dest=/etc/systemd/system/prometheus.service content="[Unit]\nDescription=Prometheus Service\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=/usr/local/bin/prometheus/prometheus --config.file=/usr/local/bin/prometheus/prometheus.yml\n\n[Install]\nWantedBy=multi-user.target\n" owner=root group=root mode=0644
+
+    - name: Reload systemd to read Prometheus service file
+      action: ansible.builtin.systemd daemon_reload=yes
+
+    - name: Enable and start Prometheus service
+      action: ansible.builtin.service name=prometheus state=started enabled=yes
+

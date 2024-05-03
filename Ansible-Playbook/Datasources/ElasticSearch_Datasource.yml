@@ -1,0 +1,33 @@
+---
+- name: Install Grafana
+  hosts: servers
+  become: yes  # Ensure that you have sudo privileges
+
+  tasks:
+    - name: Create Elasticsearch datasource
+      community.grafana.grafana_datasource:
+        name: "{{ datasource_name }}"
+        grafana_url: "{{ grafana_url }}"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        org_id: "1"
+        ds_type: "elasticsearch"
+        ds_url: "{{ datasource_url }}"
+        database:  "wazuh-alerts-*"
+        basic_auth_user: "{{ auth_username }}"
+        basic_auth_password: "{{ auth_password }}"
+        time_field: "@timestamp"
+        time_interval: "10s"
+        interval: ""
+        es_version: 7.10+
+        #index: "wazuh-monitoring-2024.12w"
+        #pattern: ""
+        tls_skip_verify: yes
+        max_concurrent_shard_requests: 5
+        #tls_ca_cert: "/etc/ssl/certs/ca.pem"
+      register: grafana_response
+
+    - name: Print response
+      debug:
+        var: grafana_response
+

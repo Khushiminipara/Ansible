@@ -1,23 +1,23 @@
 ---
 - name: Install and Configure Prometheus, Node Exporter, and Blackbox Exporter
-  hosts: servers
+  hosts: prometheus
   become: yes
 
   tasks:
     - name: Download Blackbox Exporter package
       get_url:
-        url: https://github.com/prometheus/blackbox_exporter/releases/download/v0.19.0/blackbox_exporter-0.19.0.linux-amd64.tar.gz
-        dest: /home/{{ ansible_username }}/blackbox_exporter-0.19.0.linux-amd64.tar.gz
+        url: https://github.com/prometheus/blackbox_exporter/releases/download/v0.25.0/blackbox_exporter-0.25.0.linux-amd64.tar.gz
+        dest: /home/{{ target_username }}/blackbox_exporter-0.25.0.linux-amd64.tar.gz
 
     - name: Extract Blackbox Exporter package
       ansible.builtin.unarchive:
-        src: /home/{{ ansible_username }}/blackbox_exporter-0.19.0.linux-amd64.tar.gz
-        dest: /home/{{ ansible_username }}/
+        src: /home/{{ target_username }}/blackbox_exporter-0.25.0.linux-amd64.tar.gz
+        dest: /home/{{ target_username }}/
         remote_src: yes
 
     - name: Copy Blackbox Exporter binary to /usr/local/bin
       copy:
-        src: /home/{{ ansible_username }}/blackbox_exporter-0.19.0.linux-amd64/
+        src: /home/{{ target_username }}/blackbox_exporter-0.25.0.linux-amd64/
         dest: /usr/local/bin/blackbox_exporter
         remote_src: yes
         owner: root

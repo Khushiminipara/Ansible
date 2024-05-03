@@ -1,23 +1,23 @@
 ---
 - name: Install and Configure Prometheus, Node Exporter, and Blackbox Exporter
-  hosts: servers
+  hosts: prometheus
   become: yes
 
   tasks:
     - name: Download Prometheus package
       get_url:
-        url: https://github.com/prometheus/prometheus/releases/download/v2.51.1/prometheus-2.51.1.linux-amd64.tar.gz
-        dest: /home/{{ ansible_username }}/prometheus-2.51.1.linux-amd64.tar.gz
+        url: https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz
+        dest: /home/{{ target_username }}/prometheus-2.51.2.linux-amd64.tar.gz
 
     - name: Extract Prometheus package
       ansible.builtin.unarchive:
-        src: /home/{{ ansible_username }}/prometheus-2.51.1.linux-amd64.tar.gz
-        dest: /home/{{ ansible_username}}/
+        src: /home/{{ target_username }}/prometheus-2.51.2.linux-amd64.tar.gz
+        dest: /home/{{ target_username}}/
         remote_src: yes
 
     - name: Copy Prometheus binaries to /usr/local/bin
       copy:
-        src: /home/{{ ansible_username }}/prometheus-2.51.1.linux-amd64/
+        src: /home/{{ target_username }}/prometheus-2.51.2.linux-amd64/
         dest: /usr/local/bin/prometheus/
         remote_src: yes
         owner: root

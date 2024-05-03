@@ -1,23 +1,23 @@
 ---
-- name: Install and Configure Prometheus, Node Exporter, and Blackbox Exporter
-  hosts: servers
+- name: Install and Configure Node Exporter
+  hosts: prometheus
   become: yes
 
   tasks:
     - name: Download Node Exporter package
       get_url:
-        url: https://github.com/prometheus/node_exporter/releases/download/v1.2.2/node_exporter-1.2.2.linux-amd64.tar.gz
-        dest: /home/{{ ansible_username }}/node_exporter-1.2.2.linux-amd64.tar.gz
+        url: https://github.com/prometheus/node_exporter/releases/download/v1.8.0/node_exporter-1.8.0.linux-amd64.tar.gz
+        dest: /home/{{ target_username }}/node_exporter-1.8.0.linux-amd64.tar.gz
 
     - name: Extract Node Exporter package
       ansible.builtin.unarchive:
-        src: /home/{{ ansible_username }}/node_exporter-1.2.2.linux-amd64.tar.gz
-        dest: /home/{{ ansible_username }}/
+        src: /home/{{ target_username }}/node_exporter-1.8.0.linux-amd64.tar.gz
+        dest: /home/{{ target_username }}/
         remote_src: yes
 
     - name: Copy Node Exporter binary to /usr/local/bin
       copy:
-        src: /home/{{ ansible_username }}/node_exporter-1.2.2.linux-amd64/
+        src: /home/{{ target_username }}/node_exporter-1.8.0.linux-amd64/
         dest: /usr/local/bin/node_exporter
         remote_src: yes
         owner: root

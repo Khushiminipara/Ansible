@@ -1,0 +1,2 @@
+[servers]
+192.168.1.13 control_node="Username where Semaphore is installed" ansible_username="Username of target machine" node_ip=192.168.1.13 server_ip=192.168.1.13 dashboard_ip=192.168.1.13

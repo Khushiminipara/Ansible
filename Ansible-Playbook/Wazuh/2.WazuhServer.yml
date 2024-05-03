@@ -1,18 +1,39 @@
 ---
-- name: Install Wazuh Server
-  hosts: servers
+- name: Install and Configure Wazuh Server
+  hosts: wazuh
   become: yes
 
   environment:
     NODE_NAME: "wazuh-1"
 
   tasks:
-    - name: Install the Wazuh manager package
+    - name: Install required packages
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - gnupg
+        - apt-transport-https
+        - curl
+
+    - name: Import Wazuh GPG key
+      ansible.builtin.shell: |
+        curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
+
+    - name: Add Wazuh repository
+      ansible.builtin.shell: |
+        echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" | tee -a /etc/apt/sources.list.d/wazuh.list
+
+    - name: Update package information
+      apt:
+        update_cache: yes
+
+    - name: Install Wazuh Manager
       ansible.builtin.apt:
         name: wazuh-manager
         state: present
 
-    - name: Enable and start the Wazuh manager service
+    - name: Enable and start Wazuh Manager service
       ansible.builtin.systemd:
         name: wazuh-manager
         daemon_reload: yes
@@ -24,17 +45,11 @@
         name: filebeat
         state: present
 
-    - name: Download Filebeat configuration file
-      ansible.builtin.get_url:
-        url: "https://packages.wazuh.com/4.7/tpl/wazuh/filebeat/filebeat.yml"
-        dest: "/etc/filebeat/filebeat.yml"
-        mode: '0644'
-
-    - name: Replace Filebeat configuration
-      ansible.builtin.replace:
-        path: /etc/filebeat/filebeat.yml
-        regexp: 'hosts: \["127.0.0.1:9200"\]'
-        replace: 'hosts: ["{{ node_ip }}:9200"]'
+    - name: Copy Filebeat configuration file
+      template:
+        src: /home/{{ control_username }}/filebeat.yml.j2  # Path to your local Jinja2 template file
+        dest: /etc/filebeat/filebeat.yml  # Destination path and new name on the remote machine
+        mode: "0644"  # Permissions for the file on the remote machine
 
     - name: Create Filebeat keystore for credentials
       ansible.builtin.shell: "filebeat keystore create"
@@ -45,18 +60,18 @@
     - name: Add default password to Filebeat keystore
       ansible.builtin.shell: "echo admin | filebeat keystore add password --stdin --force"
 
-    - name: Download Wazuh alerts template
+    - name: Download Wazuh Alerts Template
       ansible.builtin.get_url:
         url: "https://raw.githubusercontent.com/wazuh/wazuh/v4.7.3/extensions/elasticsearch/7.x/wazuh-template.json"
         dest: "/etc/filebeat/wazuh-template.json"
         mode: '0644'
 
-    - name: Set permissions for Wazuh alerts template
+    - name: Set Permissions for Wazuh Alerts Template
       ansible.builtin.file:
         path: "/etc/filebeat/wazuh-template.json"
         mode: 'go+r'
 
-    - name: Install Wazuh module for Filebeat
+    - name: Install Wazuh Module for Filebeat
       ansible.builtin.shell: "curl -s https://packages.wazuh.com/4.x/filebeat/wazuh-filebeat-0.3.tar.gz | tar -xvz -C /usr/share/filebeat/module"
 
     - name: Create certs directory
@@ -66,9 +81,9 @@
         mode: '0755'
       register: mkdir_result
 
-    - name: Extract certificate files
+    - name: Extract Certificate Files
       ansible.builtin.command:
-        cmd: "tar -xf /home/{{ ansible_username }}/wazuh-certificates.tar -C /etc/filebeat/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./root-ca.pem"
+        cmd: "tar -xf /home/{{ target_username }}/wazuh-certificates.tar -C /etc/filebeat/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./root-ca.pem"
       when: mkdir_result is succeeded
 
     - name: Rename PEM file

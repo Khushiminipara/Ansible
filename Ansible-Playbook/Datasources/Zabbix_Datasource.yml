@@ -1,0 +1,24 @@
+---
+- name: Add Zabbix datasource to Grafana
+  hosts: servers
+  tasks:
+    - name: Add Zabbix datasource
+      community.grafana.grafana_datasource:
+        grafana_url: "{{ grafana_url }}"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        name: "{{ datasource_name }}"
+        ds_type: "alexanderzobnin-zabbix-datasource"
+        access: "proxy"
+        ds_url: "{{ datasource_url }}"
+        zabbix_user: "{{ zabbix_username }}"
+        password: "{{ zabbix_password }}"
+        additional_json_data:
+          trends: true
+          tlsSkipVerify: true
+        is_default: false
+      register: grafana_response
+
+    - name: Print response
+      debug:
+        var: grafana_response

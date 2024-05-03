@@ -1,0 +1,69 @@
+---
+- name: Install Grafana
+  hosts: grafana
+  become: yes  # Ensure that you have sudo privileges
+
+  vars:
+    data_uid: "data_uid"
+
+  tasks:
+    - name: Copy file
+      ansible.builtin.copy:
+        src: /home/{{ control_username }}/dashboard.json  # Replace with the path to the file on the control node
+        dest: /home/{{ target_username }}/  # Replace with the path on the remote machine where you want to copy the file
+
+    - name: Get datasources list
+      uri:
+        url: "{{ grafana_url }}/api/datasources"
+        headers:
+          Authorization: "Basic {{ '{{ grafana_username }}:{{ grafana_password }}' | b64encode }}"
+          Content-Type: "application/json"
+        method: GET
+        return_content: yes
+      register: datasources_response
+
+    - name: Extract UID
+      set_fact:
+        datasource_uid: "{{ item.uid }}"
+      loop: "{{ datasources_response.json }}"
+      when: item.name == '{{ datasource_name }}'
+
+    - name: Print UID
+      debug:
+        msg: "The UID of the datasource is {{ datasource_uid }}"
+      when: datasource_uid is defined
+
+    - name: Read the content of the text file
+      ansible.builtin.slurp:
+        path: ~/Downloads/dashboard.json
+      register: file_content
+
+    - name: Convert file content from bytes to string
+      set_fact:
+        file_content_string: "{{ file_content.content | b64decode | to_nice_yaml }}"
+
+    - name: Replace old_value with new_value in the text file
+      ansible.builtin.replace:
+        path: /home/{{ target_username }}/dashboard.json
+        regexp: "{{ data_uid | regex_escape }}"
+        replace: "{{ datasource_uid }}"
+  
+    - name: Get the path of the dashboard JSON file
+      find:
+        paths: "/home/{{ target_username }}"
+        patterns: "dashboard.json"
+      register: dashboard_files
+
+    - name: Ensure the dashboard file exists
+      fail:
+        msg: "Dashboard JSON file not found in ~/Downloads directory."
+      when: dashboard_files.matched == 0
+
+    - name: Import dashboard
+      community.grafana.grafana_dashboard:
+        grafana_url: "{{ grafana_url }}"
+        grafana_user: "{{ grafana_username }}"
+        grafana_password: "{{ grafana_password }}"
+        state: present
+        overwrite: true
+        path: "{{ dashboard_files.files[0].path }}"

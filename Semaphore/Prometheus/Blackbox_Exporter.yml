@@ -1,0 +1,22 @@
+- name: Install and Configure Blackbox_Exporter
+  hosts: prometheus
+  become: yes
+  tasks:
+    - name: Download Blackbox Exporter package
+      action: get_url url=https://github.com/prometheus/blackbox_exporter/releases/download/v0.25.0/blackbox_exporter-0.25.0.linux-amd64.tar.gz dest=/home/{{ target_username }}/blackbox_exporter-0.25.0.linux-amd64.tar.gz
+
+    - name: Extract Blackbox Exporter package
+      action: ansible.builtin.unarchive src=/home/{{ target_username }}/blackbox_exporter-0.25.0.linux-amd64.tar.gz dest=/home/{{ target_username }}/ remote_src=yes
+
+    - name: Copy Blackbox Exporter binary to /usr/local/bin
+      action: copy src=/home/{{ target_username }}/blackbox_exporter-0.25.0.linux-amd64/ dest=/usr/local/bin/blackbox_exporter remote_src=yes owner=root group=root mode=0755
+
+    - name: Create Blackbox Exporter systemd service file
+      action: copy dest=/etc/systemd/system/blackbox-exporter.service content="[Unit]\nDescription=Blackbox Exporter\nAfter=network.target\n\n[Service]\nExecStart=/usr/local/bin/blackbox_exporter/blackbox_exporter --config.file=/usr/local/bin/blackbox_exporter/blackbox.yml\n\n[Install]\nWantedBy=multi-user.target\n" owner=root group=root mode=0644
+
+    - name: Reload systemd to read Blackbox Exporter service file
+      action: ansible.builtin.systemd daemon_reload=yes
+
+    - name: Enable and start Blackbox Exporter service
+      action: ansible.builtin.service name=blackbox-exporter state=started enabled=yes
+

@@ -1,6 +1,6 @@
 ---
-- name: Install and Configure Wazuh Dashboard
-  hosts: wazuh
+- name: Configure Wazuh Dashboard
+  hosts: servers
   become: yes
 
   environment:
@@ -8,59 +8,67 @@
 
   tasks:
     - name: Install required packages
-      apt:
+      package:
         name: "{{ item }}"
         state: present
       loop:
-        - gnupg
-        - apt-transport-https
         - debhelper
         - tar
         - curl
         - libcap2-bin
+        - gnupg
+        - apt-transport-https
+        - curl
 
     - name: Import Wazuh GPG key
-      ansible.builtin.shell: |
-        curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg
+      shell: "curl -s https://packages.wazuh.com/key/GPG-KEY-WAZUH | gpg --no-default-keyring --keyring gnupg-ring:/usr/share/keyrings/wazuh.gpg --import && chmod 644 /usr/share/keyrings/wazuh.gpg"
+      args:
+        creates: /usr/share/keyrings/wazuh.gpg
 
     - name: Add Wazuh repository
-      ansible.builtin.shell: |
-        echo "deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main" | tee -a /etc/apt/sources.list.d/wazuh.list
+      shell: "echo 'deb [signed-by=/usr/share/keyrings/wazuh.gpg] https://packages.wazuh.com/4.x/apt/ stable main' | tee -a /etc/apt/sources.list.d/wazuh.list"
+      args:
+        creates: /etc/apt/sources.list.d/wazuh.list
 
     - name: Update package information
-      apt:
-        update_cache: yes
+      shell: apt-get update
 
     - name: Install Wazuh Dashboard
-      ansible.builtin.shell:
+      shell:
         cmd: "apt-get -y install wazuh-dashboard"
 
     - name: Copy Dashboard Configuration File
       template:
-        src: /home/{{ control_username }}/opensearch_dashboards.yml.j2  # Path to your local Jinja2 template file
+        src: /home/{{ control_node }}/opensearch_dashboards.yml.j2  # Path to your local Jinja2 template file
         dest: /etc/wazuh-dashboard/opensearch_dashboards.yml  # Destination path and new name on the remote machine
+        owner: "root"  # Owner of the file on the remote machine
+        group: "root"  # Group of the file on the remote machine
         mode: "0644"  # Permissions for the file on the remote machine
 
     - name: Create certs directory
-      ansible.builtin.file:
+      file:
         path: "/etc/wazuh-dashboard/certs"
         state: directory
 
     - name: Extract certificates
-      ansible.builtin.shell:
-        cmd: "tar -xf /home/{{ target_username }}/wazuh-certificates.tar -C /etc/wazuh-dashboard/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./root-ca.pem"
+      shell:
+        cmd: "tar -xf /home/{{ ansible_username }}/wazuh-certificates.tar -C /etc/wazuh-dashboard/certs/ ./$NODE_NAME.pem ./$NODE_NAME-key.pem ./root-ca.pem"
 
     - name: Rename certificate files
-      ansible.builtin.shell:
+      shell:
         cmd: "mv -n /etc/wazuh-dashboard/certs/$NODE_NAME.pem /etc/wazuh-dashboard/certs/dashboard.pem && mv -n /etc/wazuh-dashboard/certs/$NODE_NAME-key.pem /etc/wazuh-dashboard/certs/dashboard-key.pem"
 
+    - name: Rename key files
+      shell:
+        cmd: "mv -n /etc/wazuh-dashboard/certs/$NODE_NAME-key.pem /etc/wazuh-dashboard/certs/dashboard-key.pem"
+
     - name: Set permissions for certs directory
-      ansible.builtin.file:
+      file:
         path: "/etc/wazuh-dashboard/certs"
         mode: "0500"
 
     - name: Set permissions on certificate files
-      ansible.builtin.file:
+      file:
         path: "/etc/wazuh-dashboard/certs/{{ item }}"
         mode: "0400"
       loop:
@@ -69,19 +77,19 @@
         - root-ca.pem
 
     - name: Change ownership of certs directory
-      ansible.builtin.shell:
+      shell:
         cmd: "chown -R wazuh-dashboard:wazuh-dashboard /etc/wazuh-dashboard/certs"
 
     - name: Reload systemd daemon
-      ansible.builtin.systemd:
+      systemd:
         daemon_reload: yes
 
     - name: Enable Wazuh Dashboard service
-      ansible.builtin.service:
+      service:
         name: wazuh-dashboard
         enabled: yes
 
     - name: Start Wazuh Dashboard service
-      ansible.builtin.service:
+      service:
         name: wazuh-dashboard
         state: started
